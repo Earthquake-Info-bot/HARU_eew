@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>EEW_forHARU_v3.1.1</title>
+<style>
+body {
+  font-family:"Yu Gothic","YuGothic","メイリオ",sans-serif;
+  white-space: pre-wrap;
+  margin: 5px;
+  padding: 5px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+}
+#eew { 
+  margin: 0; 
+  padding: 0; 
+  font-family:"Yu Gothic","YuGothic","メイリオ",sans-serif;
+}
+#status { 
+  font-size: 12px; 
+  margin-bottom: 0px; 
+}
+#copyBtn {
+  font-size: 12px;
+  padding: 2px 5px;
+  margin-bottom: 0px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div id="status">更新中...</div>
+<button id="copyBtn">本文をコピー</button>
+<pre id="eew">読み込み中...</pre>
+
+<script>
+// 地方 ⇔ 詳細地域 対応表（完全版）
+const regionMap = {
+  "道央": ["石狩", "後志", "空知"],
+  "道南": ["渡島", "檜山", "奥尻島", "胆振", "日高"],
+  "道北": ["上川", "留萌", "宗谷", "利尻礼文"],
+  "道東": ["網走", "北見", "紋別", "十勝", "釧路", "根室"],
+  "青森": ["青森"],
+  "岩手": ["岩手"],
+  "宮城": ["宮城"],
+  "秋田": ["秋田"],
+  "山形": ["山形"],
+  "福島": ["福島"],
+  "茨城": ["茨城"],
+  "栃木": ["栃木"],
+  "群馬": ["群馬"],
+  "埼玉": ["埼玉"],
+  "千葉": ["千葉"],
+  "東京": ["東京"],
+  "伊豆諸島": ["伊豆大島", "新島", "神津島", "三宅島", "八丈島"],
+  "小笠原": ["小笠原"],
+  "神奈川": ["神奈川"],
+  "新潟": ["新潟", "佐渡"],
+  "富山": ["富山"],
+  "石川": ["石川"],
+  "福井": ["福井"],
+  "山梨": ["山梨"],
+  "長野": ["長野"],
+  "岐阜": ["岐阜"],
+  "静岡": ["静岡"],
+  "愛知": ["愛知"],
+  "三重": ["三重"],
+  "滋賀": ["滋賀"],
+  "京都": ["京都府"],
+  "大阪": ["大阪"],
+  "兵庫": ["兵庫", "淡路島"],
+  "奈良": ["奈良"],
+  "和歌山": ["和歌山"],
+  "鳥取": ["鳥取"],
+  "島根": ["島根", "隠岐"],
+  "岡山": ["岡山"],
+  "広島": ["広島"],
+  "山口": ["山口"],
+  "徳島": ["徳島"],
+  "香川": ["香川"],
+  "愛媛": ["愛媛"],
+  "高知": ["高知"],
+  "福岡": ["福岡"],
+  "佐賀": ["佐賀"],
+  "長崎": ["長崎"],
+  "熊本": ["熊本"],
+  "大分": ["大分"],
+  "宮崎": ["宮崎"],
+  "鹿児島": ["薩摩", "大隈", "十島村", "甑島", "種子島", "屋久島"],
+  "奄美群島": ["奄美"],
+  "沖縄本島": ["沖縄本島", "久米島"],
+  "大東島": ["大東島"],
+  "宮古島": ["宮古島"],
+  "八重山": ["石垣島", "与那国島", "西表島"]
+};
+
+const outputEl = document.getElementById("eew");
+const statusEl = document.getElementById("status");
+const copyBtn = document.getElementById("copyBtn");
+
+async function updateEEW() {
+  try {
+    const res = await fetch("https://api.wolfx.jp/jma_eew.json");
+    //const res = await fetch("https://script.google.com/macros/s/AKfycbzgP8R7vowRFrefHbUIkAcGt4NFjJZcuVnnpVqIjpprlCA44PtTk7ffHs-f4HP8Yk8A/exec");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+
+    let eewMessage = "";
+
+    if (data.isTraining) {
+      outputEl.textContent = "訓練報のため処理終了";
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth()+1).padStart(2,'0');
+      const d = String(now.getDate()).padStart(2,'0');
+      const h = String(now.getHours()).padStart(2,'0');
+      const min = String(now.getMinutes()).padStart(2,'0');
+      const s = String(now.getSeconds()).padStart(2,'0');
+      statusEl.textContent = `最終更新: ${y}/${m}/${d} ${h}:${min}:${s}`;
+      return;
+    }
+
+    let maxInt = data.MaxIntensity;
+    const isWarn = data.isWarn;
+    let coloredTitle = data.Title;
+
+    if (isWarn) {
+      coloredTitle = `【${data.Title}】`;
+    } else {
+      coloredTitle = `【🟥${data.Title}】`;
+    }
+
+    eewMessage += coloredTitle;
+
+    const serialText = data.isFinal ? `#第${data.Serial}(最終)報` : `#第${data.Serial}報`;
+    document.body.style.background = data.isFinal ? "#ffffff" : "#f3cccb";
+    let plum = "";
+    if (data.isAssumption) plum = "  /  PLUM法";
+    eewMessage += `\n${serialText}${plum}\n`;
+
+    if (data.isCancel) {
+      const hypocenter = data.Hypocenter ?? "震源地不明";
+      const tz = "Asia/Tokyo";
+      const announceDate = data.AnnouncedTime ? new Date(data.AnnouncedTime) : null;
+      const announceStr = announceDate
+        ? `${String(announceDate.getDate()).padStart(2,'0')}日${String(announceDate.getHours()).padStart(2,'0')}:${String(announceDate.getMinutes()).padStart(2,'0')}:${String(announceDate.getSeconds()).padStart(2,'0')}`
+        : "発表時刻不明";
+
+      eewMessage += `\nこの緊急地震速報${hypocenter ? `（震源地：${hypocenter}）` : ""}はキャンセルされました。`;
+
+      outputEl.textContent = eewMessage;
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth()+1).padStart(2,'0');
+      const d = String(now.getDate()).padStart(2,'0');
+      const h = String(now.getHours()).padStart(2,'0');
+      const min = String(now.getMinutes()).padStart(2,'0');
+      const s = String(now.getSeconds()).padStart(2,'0');
+      statusEl.textContent = `最終更新: ${y}/${m}/${d} ${h}:${min}:${s}`;
+      return;
+    }
+
+      if (data.isWarn && data.WarnArea && data.WarnArea.length > 0) {
+        // ▼ 対象地域（地方）抽出
+        const regionSet = new Set();
+      
+        for (const { Chiiki } of data.WarnArea) {
+          for (const [region, areas] of Object.entries(regionMap)) {
+            if (areas.some(area => Chiiki.includes(area))) {
+              regionSet.add(region);
+            }
+          }
+        }
+      
+        // ▼ 地方の表示順（固定）
+        const regionOrder2 = [
+          "道北","道央","道南","道東",
+          "青森","岩手","宮城","秋田","山形","福島",
+          "茨城","栃木","群馬","埼玉","千葉","東京","伊豆諸島","小笠原","神奈川",
+          "新潟","富山","石川","福井","山梨","長野",
+          "岐阜","静岡","愛知","三重",
+          "滋賀","京都","大阪","兵庫","奈良","和歌山",
+          "鳥取","島根","岡山","広島","山口",
+          "徳島","香川","愛媛","高知",
+          "福岡","佐賀","長崎","熊本","大分","宮崎","鹿児島",
+          "奄美群島","沖縄本島","大東島","宮古島","八重山"
+        ];
+      
+        const sortedRegions = regionOrder2.filter(r => regionSet.has(r));
+      
+        // ▼ 出力
+        eewMessage += `\n<${sortedRegions.join("、")}>\n\n以上の地域では強い揺れに警戒してください！\n\n＊震源などに関する情報`;
+      }
+    
+    if (data.isAssumption) {
+      const hypocenter = data.Hypocenter ?? "震源地不明";
+      eewMessage += `
+${hypocenter} で揺れ
+推定最大震度　${maxInt}
+`;
+    } else {
+      const hypocenter = data.Hypocenter ?? "不明";
+      const magnitude = (data.Magunitude != null) ? Number(data.Magunitude).toFixed(1) : "不明";
+      const depth = data.Depth ?? "不明";
+      eewMessage += `
+震源地　${hypocenter}
+推定最大震度　${maxInt}
+地震の規模　M${magnitude}
+震源の深さ　${depth}km
+`;
+    }
+
+    const tz = "Asia/Tokyo";
+    const originStr = data.OriginTime
+      ? (() => {
+          const d = new Date(data.OriginTime);
+          const yyyy = d.getFullYear();
+          const MM = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const HH = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          const ss = String(d.getSeconds()).padStart(2, '0');
+          return `${yyyy}/${MM}/${dd} ${HH}:${mm}:${ss}`;
+        })()
+      : "----/--/-- --:--:--";
+    
+    eewMessage += `\n${originStr} 地震発生`;
+
+    outputEl.textContent = eewMessage;
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+    const h = String(now.getHours()).padStart(2,'0');
+    const min = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    statusEl.textContent = `最終更新: ${y}/${m}/${d} ${h}:${min}:${s}`;
+    
+  } catch(e) {
+    outputEl.textContent = "取得エラー: " + e.message + (e.stack ? "\n" + e.stack : "");
+  }
+}
+
+updateEEW();
+setInterval(updateEEW, 2000);
+
+// コピー機能
+copyBtn.addEventListener("click", () => {
+  const text = outputEl.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const originalText = copyBtn.textContent;
+    copyBtn.textContent = "コピー完了";
+    setTimeout(() => { 
+      copyBtn.textContent = originalText;
+    }, 1500);
+  }).catch(err => {
+    alert("コピーに失敗しました: " + err);
+  });
+});
+</script>
+</body>
+</html>
