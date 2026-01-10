@@ -127,9 +127,9 @@ async function updateEEW() {
     let coloredTitle = data.Title;
 
     if (isWarn) {
-      coloredTitle = `【${data.Title}】`;
-    } else {
       coloredTitle = `【🟥${data.Title}】`;
+    } else {
+      coloredTitle = `【${data.Title}】`;
     }
 
     eewMessage += coloredTitle;
@@ -142,11 +142,6 @@ async function updateEEW() {
 
     if (data.isCancel) {
       const hypocenter = data.Hypocenter ?? "震源地不明";
-      const tz = "Asia/Tokyo";
-      const announceDate = data.AnnouncedTime ? new Date(data.AnnouncedTime) : null;
-      const announceStr = announceDate
-        ? `${String(announceDate.getDate()).padStart(2,'0')}日${String(announceDate.getHours()).padStart(2,'0')}:${String(announceDate.getMinutes()).padStart(2,'0')}:${String(announceDate.getSeconds()).padStart(2,'0')}`
-        : "発表時刻不明";
 
       eewMessage += `\nこの緊急地震速報${hypocenter ? `（震源地：${hypocenter}）` : ""}はキャンセルされました。`;
 
